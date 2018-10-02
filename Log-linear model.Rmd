@@ -1,0 +1,502 @@
+---
+title: "Log-linear model"
+author: "T.SHIBUYA"
+date: "2018蟷ｴ6譛<88>7譌･"
+output:
+  pdf_document: default
+  html_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, comment=NA)
+
+d1 <- c("good","bad","good","good")
+d2 <- c("exciting", "exciting")
+d4 <- c("bad","boring","boring","boring")
+d5 <- c("bad","exciting","bad")
+
+# 各事例ベクトルをリストに内包する。
+P <- list("d1"=d1,"d2"=d2)
+N <- list("d4"=d4,"d5"=d5)
+
+D <- list("P"=P, "N"=N)
+
+words <- c("good", "bad", "exciting", "boring")
+
+
+```
+
+今回はこんなデータを用意
+（教科書の通り）
+
+```{r}
+
+return(P)
+
+return(N)
+
+```
+
+それをひとつのデータ（リスト形式）にまとめる。
+
+```{r}
+return(D)
+```
+
+
+
+対数線形モデルの学習（パラメタ推定）を行うための関数を定義
+
+```{r}
+
+f <- function(d, y, w, learn = 0.1, conv =0.001){
+  
+  # d : 文書
+  # y : クラス数
+  # w : 単語
+  
+  # マッチング関数
+  m <- function(d, w){
+    
+    # 文書内に指定した単語が出現しているかどうかをT or Fで返して，それを01に書き換える。
+    
+    a <- d == w
+    
+    if(sum(a) != 0 ){
+      a <- 1
+    } else {
+      a <- 0
+    }
+    return(a)
+  }
+  
+  
+  # すべての文書ベクトルを，ひとつのリストに格納する。
+  dd <- unlist(d, recursive = F) # recursive = F　でリストの構造を残したまま，unlistできる。
+  
+  # 結果代入用の行列を作成
+  # そのためにまずは全，文書数をカウントする
+
+  v <- length(dd)
+  
+  mat <- matrix(0, nrow = v * length(d), ncol = length(w) * length(d))
+  
+  cc <- 0
+  
+  for(i in 1:y){
+    
+    n <- length(dd)
+    
+    # マッチングした値を代入する行数
+    if(i == 1){
+      rc1 <- 1
+      rc2 <- i * length(w)
+    } else {
+      rc1 <- rc2 + 1
+      rc2 <- i * length(w)
+    }
+    
+    for(j in 1:n){
+      
+      # マッチングした値を代入する列数
+      cc <- cc + 1
+      
+      w <- as.matrix(w)
+      
+      mat[cc, rc1:rc2] <- apply(w, 1, m, d = dd[[j]])
+      
+      # matの構造について
+      # クラス>文書
+      
+    }
+    
+  }
+  
+  
+  
+  mat2 <- matrix(0, nrow = v, ncol = length(w) * length(d))
+  
+  cc <- 0
+  
+  for(i in 1:y){
+    
+    n <- length(d[[i]])
+    
+    # マッチングした値を代入する行数
+    if(i == 1){
+      rc1 <- 1
+      rc2 <- i * length(w)
+    } else {
+      rc1 <- rc2 + 1
+      rc2 <- i * length(w)
+    }
+    
+    for(j in 1:n){
+      
+      # マッチングした値を代入する列数
+      cc <- cc + 1
+      
+      w <- as.matrix(w)
+      
+      mat2[cc, rc1:rc2] <- apply(w, 1, m, d = d[[i]][[j]])
+      
+      # mat2の構造について
+      # クラス>文書
+      
+    }
+    
+  }
+  
+  
+  
+  # 尤度関数の一階偏微分をもちいて，最急勾配法を実行する。
+  
+
+  # 関数定義
+  
+  
+  dL <- function(dat, w, dat2, C = 1){
+    
+    # dat  : 各クラス，全部の事例における素性ベクトルを行に持つ，行列。
+    # w    : パラメタ
+    # dat2 : 特定のクラスの，特定の文書の素性ベクトルを行に持つ，行列
+    # C    : 正の定数
+    
+    # まずは正則化項は無視する。
+    
+    sec <- function(dat, w){
+      
+      Zdw <- sum(exp(dat %*% w))
+      
+      sigmay <- 
+        colSums(
+          t(
+            apply(dat, 1, 
+                  function(x){
+                    P <- as.vector(exp(x %*% w) * 1/Zdw)
+                    as.vector(x) * P
+                  }
+            )
+          )
+        )
+      
+      t(sigmay)
+      
+    }
+
+    
+    
+    # 計算結果代入用ベクトル
+    
+    res <- numeric(0)
+    
+    
+    # Sigma_yの計算
+    for(i in 1:nrow(dat2)){
+      
+      key <- seq(1, nrow(dat), nrow(dat2)) 
+      key <- key + i - 1
+      
+      first <- dat2[i, ]
+      
+      second <-sec(dat[key,], w)
+      
+      res <- rbind(res, (first - second))
+      
+      if(i == nrow(dat2)){
+        res <- colSums(res)
+      }
+      
+    }
+    
+    res <- as.matrix(res)
+    
+    # 正則化項の計算
+    
+    reg <- C * w
+    
+    return(res-reg)
+    
+    
+  }
+  
+  
+  
+  
+  # 初期値
+  w0 <- matrix(0, nrow = ncol(mat), ncol =1) # initial value
+  
+  # 繰り返し用
+  e <- 0
+  
+  # カウント用
+  count <- 0
+  
+  while(e == 0){
+    
+    # 学習率は0.1に設定
+    w1 <- w0 + learn * dL(dat = mat, w = w0, dat2 = mat2, C = 1)
+    
+    if(max(abs(w1 - w0)) < conv) e <- 1
+    count <- count + 1
+    w0 <- w1
+    
+  }
+  
+  res <- list("para" = w1, "iteration" = count)
+  
+  return(res)
+  
+}
+
+
+
+```
+
+
+実行すると，こんなかんじ。  
+#####  例題4.13
+
+```{r}
+
+# 文書内で出現する単語を，自分で指定する。
+
+return(words)
+
+# 自動で出すこともできる。
+unique(unlist(D))
+
+res  <- f(D, 2, words, conv = 0.0001)
+return(res)
+
+```
+
+教科書の値と一致する。
+
+```{r}
+
+round(res$para, digits = 2)
+
+```
+
+重要なのは，学習（推定）したパラメタを使って，新たな文書を分類することだったので，新たな事例，
+
+```{r}
+
+dn <- c("exciting", "boring")
+
+```
+を分類してみましょう。   
+
+
+分類用の関数を定義します。
+```{r}
+classify <- function(para, d, c, w){
+  
+  # para : 対数線形モデルにより推定したパラメタ
+  #    d : 分類したい文書
+  #    c : 分類先のクラス（順番に注意）
+  #    w : 単語
+  
+  
+  # マッチング関数
+  m <- function(d, w){
+    
+    # 文書内に指定した単語が出現しているかどうかをT or Fで返して，それを01に書き換える。
+    
+    a <- d == w
+    
+    if(sum(a) != 0 ){
+      a <- 1
+    } else {
+      a <- 0
+    }
+    return(a)
+  }
+  
+  
+  # 結果代入用の行列を作成
+  mat <- matrix(0, nrow = length(c), ncol = nrow(para))
+  
+  
+  for(i in 1:length(c)){
+    
+    # マッチングした値を代入する行数
+    if(i == 1){
+      rc1 <- 1
+      rc2 <- i * length(w)
+    } else {
+      rc1 <- rc2 + 1
+      rc2 <- i * length(w)
+    }
+    
+    # マッチングした値を代入する列数はiでよい。
+    
+    mat[i, rc1:rc2] <- apply(as.matrix(w), 1, m, d = d)
+    
+  }
+  
+  
+  # 内積を計算し，分類する。
+  
+  res <- mat %*% para
+  rownames(res) <- c
+
+  key <- res == max(res)
+  
+  message("この文書のクラスは", c[key], "です")
+  
+  return(res)
+  
+}
+```
+
+
+これを実行しましょう。  
+分類したいクラスはPとNなので`c("P", "N")`をクラスとして指定します。  
+指定する際は，順番に注意する。  
+
+
+
+```{r}
+classify(res$para, dn, c("P", "N"), words)
+```
+
+
+
+
+学習率を変化させると，どうなるのでしょうか。
+
+
+```{r}
+
+# 1
+f(D, 2, words, learn = 0.01)
+
+# 2
+f(D, 2, words, learn = 0.001)
+
+# 3
+f(D, 2, words, learn = 0.01, conv = 0.0001)
+
+
+```
+
+収束基準では，`max(abs(w1 - w0)) < conv`という値を用いている。  
+
+そのため学習率を小さくするならば，一緒に収束基準も小さくしなくてはならない。  
+
+
+
+データを少し変えてみましょう。
+
+```{r, include=F}
+d1 <- c("good","bad","good","good")
+d2 <- c("exciting", "exciting")
+d3 <- c("good","good","exciting","boring")
+d4 <- c("bad","boring","boring","boring")
+d5 <- c("bad","exciting","bad")
+d6 <- c("bad","bad","boring","boring")
+
+# 各事例ベクトルをリストに内包する。
+P <- list("d1"=d1,"d2"=d2,"d3"=d3)
+N <- list("d4"=d4,"d5"=d5,"d6"=d6)
+
+D <- list("P"=P, "N"=N)
+```
+
+```{r}
+return(D)
+```
+
+
+これで対数線形モデルによる学習をおこなう。
+
+```{r}
+
+res <- f(D, 2, words)
+
+return(res)
+
+```
+
+検算のしようがないですが，いちおう収束はしています。  
+  
+おなじく，分類もしてみましょう。同じ文書ではつまらないので，今度はPさんの発言だと分類されるべき文書を作ってみましょう。  
+
+```{r}
+
+dn <- c("good", "exciting", "good", "boring")
+
+classify(res$para, dn, c("P","N"), words)
+
+```
+
+ちゃんとこの文書はPのものであると分類されました。  
+
+今度は訓練データを変えてみましょう。
+
+```{r}
+d1 <- c("happy", "happy", "lucky")
+d2 <- c("joyful", "happy", "lucky")
+d3 <- c("happy", "joyful", "sad")
+
+d4 <- c("lucky","chance","lucky","happy")
+d5 <- c("lucky","chance")
+d6 <- c("chance","bad","chance","lucky")
+
+d7 <- c("bad","happy","sad")
+d8 <- c("sorry","sad","sad")
+d9 <- c("bad","chance")
+
+P <- list(d1, d2, d3)
+Q <- list(d4, d5, d6)
+R <- list(d7, d8, d9)
+
+D <- list(P, Q, R)
+
+```
+訓練データの作成はこれで終了です。  
+（リスト形式に格納する方法が，今のところ手動なので，当然実用には程遠いですね。）  
+
+```{r}
+words <- unique(unlist(D))
+
+res <- f(D, 3, words)
+
+res
+
+```
+26回の反復で収束しました。  
+パラメタも推定できているようです。  
+
+
+次は，このパラメタを使って新しい文書を分類しましょう。
+
+
+```{r}
+dn <- c("chance", "sad")
+
+classify(res$para, dn, c("P","Q","R"), words)
+
+```
+この文書はRだと判断されました。
+
+
+
+```{r}
+dn <- c("chance", "sad", "happy", "lucky")
+
+classify(res$para, dn, c("P","Q","R"), words)
+
+```
+
+もうすこし，ややこしい文書の分類ではどうでしょうか。
+
+```{r}
+dn <- c("chance", "sad", "happy", "lucky", "joyful", "bad")
+
+classify(res$para, dn, c("P","Q","R"), words)
+```
+
+内積の結果，僅差でPの文書だと判断されました。
