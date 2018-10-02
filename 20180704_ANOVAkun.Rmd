@@ -1,0 +1,153 @@
+---
+title: "ANOVA"
+author: "T.Shibuya"
+date: "2018/07/05"
+output:
+  html_document: default
+  pdf_document:
+    latex_engine: lualatex 
+    documentclass: ltjsarticle 
+  word_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, comment = NA)
+```
+
+##  ANOVA君の入手，library()
+
+まずは分散分析用の関数，ANOVA君をweb上よりDLする。
+
+```{r}
+source(file = "http://riseki.php.xdomain.jp/index.php?plugin=attach&refer=ANOVA%E5%90%9B&openfile=anovakun_482.txt", encoding = "CP932")
+```
+
+##  対応のない一要因分散分析
+
+次はデータを作成する。  
+
+これは一要因の対応のない分散分析
+```{r}
+kyouzai <- c(rep("教材A",5),rep("教材B",5),rep("教材C",5))
+score   <- c(7,5,8,9,6,3,4,3,2,5,6,9,4,6,7)
+ANOVA1 <- data.frame(kyouzai = kyouzai, score =score)
+
+#ANOVA1
+
+tapply(ANOVA1$score, ANOVA1$kyouzai, mean)
+
+#ANOVAkunを実行
+
+anovakun(ANOVA1, "As", 3)
+```
+
+
+
+##  対応のない２要因分散分析
+
+二つ目の課題用のデータを作成する。  
+今度は，完全無作為２要因デザイン（対応のない２要因分散分析）を実行する。
+
+```{r}
+kyouzai <- rep(c(rep("教材A",5),rep("教材B",5),rep("教材C",5)),2)
+sex     <- c(rep("M", 15), rep("F", 15))
+score   <- c(3,5,6,2,5,7,8,6,9,5,2,3,4,8,5,
+             4,7,5,6,7,3,5,4,6,2,7,8,9,5,6)
+ANOVA2 <- data.frame(kyouzai = kyouzai, sex = sex, score = score)
+
+tapply(ANOVA2$score, list(ANOVA2$kyouzai, ANOVA2$sex), mean)
+
+# ANOVA2
+
+anovakun(ANOVA2, "ABs", 3,2)
+```
+##  Graph output
+```{r, echo=F}
+b1 <- c(4.2,7.0,4.4)
+b2 <- c(5.8,4.0,7.0)
+lab <- c(1,2,3)
+dat1 <- cbind(lab,b1)
+dat2 <- cbind(lab,b2)
+
+plot(dat1, type="b", ylim = c(0,8), xlim = c(0.5,3.5), xaxt="n", xlab ="教材", ylab ="得点", pch = 16)
+par(new = T)
+plot(dat2, type="b", ylim = c(0,8), xlim = c(0.5,3.5), lty = 2, xaxt="n", xlab = "", ylab = "")
+axis(1, c(1,2,3), c("教材A","教材B","教材C"))
+legend("topleft", legend = unique(sex), pch = c(16,1), lty = c(1,2))
+```
+
+##  対応のある一要因分散分析
+
+最後に，対応のある一要因デザインを扱う。
+
+```{r}
+youshi   <- c(1,2,2,2,2,3,3,4,4,4,5,5,6,7,8)
+gakureki <- c(1,1,1,1,2,2,2,2,2,2,2,3,3,3,4)
+yutakasa <- c(0,1,1,1,1,1,2,2,3,3,4,4,5,6,7)
+
+ANOVA3 <- data.frame(youshi = youshi, gakureki = gakureki, yutakasa = yutakasa)
+
+colMeans(ANOVA3)
+
+anovakun(ANOVA3, "sA", 3, gg = T)
+```
+
+```{r}
+dat <- cbind(c(1,2,3),colMeans(ANOVA3))
+
+plot(dat, type="b", ylim = c(0,8), xlim = c(0.5,3.5), xaxt="n", xlab ="優越属性", ylab ="妬み", pch = 16)
+axis(1, c(1,2,3), c("容姿","豊かさ","学歴"))
+```
+
+
+
+```{r}
+zokusei <- c(rep("YF",4), rep("YM",4), rep("O",4))
+pre  <- c(43,46,49,46,43,49,46,58,37,25,43,31) * 1/10 
+post <- c(34,37,31,34,22,28,25,25,52,49,61,46) * 1/10
+rest <- c(25,10,22,31,19,25,13,19,22,28,25,25) * 1/10
+
+ANOVA4 <- data.frame(zokusei = zokusei, pre = pre, post = post, rest = rest)
+
+tapply(ANOVA4$pre, ANOVA4$zokusei, mean)
+
+anovakun(ANOVA4, "AsB", 3, 3)
+```
+
+##  Output Graph
+```{r, echo=F}
+
+#b1 <- c(4.6,4.9,3.4)
+#b2 <- c(3.4,2.5,5.2)
+#b3 <- c(2.2,1.9,2.5)
+
+a1 <- c(4.6,3.4,2.2)
+a2 <- c(4.9,2.5,1.9)
+a3 <- c(3.4,5.2,2.5)
+
+lab <- c(1,2,3)
+
+dat1 <- cbind(lab,a1)
+dat2 <- cbind(lab,a2)
+dat3 <- cbind(lab,a3)
+
+plot(dat1, type="b", ylim = c(0,8), xlim = c(0.5,3.5), xaxt="n", xlab ="測定時期", ylab ="コルチゾール量(nmol/l)", pch = 1)
+par(new=T)
+plot(dat2, type="b", ylim = c(0,8), xlim = c(0.5,3.5), xaxt="n", xlab ="", ylab ="", pch = 2, lty=2)
+par(new=T)
+plot(dat3, type="b", ylim = c(0,8), xlim = c(0.5,3.5), xaxt="n", xlab ="", ylab ="", pch = 4, lty=3)
+
+axis(1, c(1,2,3), c("運動前","運動後","休息後"))
+legend("topleft", legend = unique(zokusei), pch = c(1,2,4), lty = c(1,2,3))
+
+```
+
+
+
+
+
+
+
+
+
+

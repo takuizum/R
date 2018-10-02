@@ -1,0 +1,115 @@
+---
+title: "assignment kuji"
+date: "`r Sys.Date()`"
+output: radix::radix_article
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(magrittr)
+```
+
+全部で１４章を６人で分担するので，以下のようにベクトルを用意
+
+```{r data}
+# chapter vecor in text
+chapter = c(1:14)# %>% rep(2) %>% sort()
+
+# student name in class
+student = c("Shibuya","Tabata","Ejiri","Ishikawa","Oka","Kawano")
+```
+
+ついでに，完成する表に日付も入っていると便利なので，毎週月曜日から祝日を抜いたベクトルを作成する。
+
+```{r date}
+
+# date vector
+today = Sys.Date()
+class_days = seq(today, length.out = 14 ,by="1 week")
+holidays = c("2018-10-08","2018-12-24","2018-12-31","2019-1-14","2019-2-11") %>% as.Date()
+i = 0
+while(i != length(chapter)){
+  Class = seq(today, length.out = 2 ,by="1 week") %>% last()
+  check_holidays = Class %in% holidays
+  if(!check_holidays){
+    i = i + 1
+    class_days[i] = Class
+  } 
+  today = Class
+}
+```
+
+授業の分担人数は，一章あたり２人にするので，
+
+```{r}
+
+# reminder
+cat("The reminder is ",28%/%6," .")
+
+```
+
+４人は分担が一つ多くなる。のこり二人はラッキーの人。
+
+この後はランダムにベクトルから取り出していくため，シードを固定しておくと他の環境でも実験結果が再現できて便利である。シードは田畑さんに適当に決めてもらった。
+
+ランダムに取り出す際は，2週連続で同じ人が分担にあたらないように場合分けをする必要がある。
+
+```{r}
+#student_5 = rep(student,5)
+#ass_vec = sample(student_5,28,replace=F)
+
+set.seed(1033)
+
+ass_vec = numeric(0)
+for(i in 1:5){
+  if(i != 5){
+    temp = sample(student,6,replace=F)
+    jadge = (temp %>% head(2)) %in% (ass_vec %>% tail(2))
+    while(any(jadge)){
+      temp = sample(student,6,replace=F)
+      jadge = (temp %>% head(2)) %in% (ass_vec %>% tail(2))
+    }
+    ass_vec = c(ass_vec,temp)
+  } else {
+    temp = sample(student,4,replace=F)
+    jadge = (temp %>% head(2)) %in% (ass_vec %>% tail(2))
+    while(any(jadge)){
+      temp = sample(student,4,replace=F)
+      jadge = (temp %>% head(2)) %in% (ass_vec %>% tail(2))
+    }
+    ass_vec = c(ass_vec,temp)
+  }
+} 
+
+ass_tbl = ass_vec %>% table()
+
+lacky_boy = names(ass_tbl)[as.vector(ass_tbl==4)]
+
+cat("You are a lacky boy!. ",lacky_boy[1]," and ",lacky_boy[2],".")
+
+```
+
+これでランダムに割り振ったベクトルが完成した。
+あとは  このままの順番で１章〜１４章まで割り振るだけでOK  
+
+振り分ける。
+
+```{r}
+#assignment = sample(ass_vec,28, replace = F)
+#names(assignment) = chapter
+
+assignment = ass_vec %>% split(c(1,2))
+
+ass_df = data.frame(chapter=chapter,data=class_days,assign1=assignment[1],assign2=assignment[2], stringsAsFactors = F, check.names = F)
+
+library(DT)
+ass_df %>% datatable(rownames = F)
+
+# output CSV data
+write.csv(ass_df, file = "20181001assignment_table.csv", row.names = F, quote = F)
+```
+
+
+
+
+

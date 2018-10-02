@@ -1,0 +1,86 @@
+---
+title: "RegPractice"
+author: "T.SHIBUYA"
+date: "2018蟷ｴ6譛<88>25譌･"
+output:
+  pdf_document:
+    latex_engine: platex 
+  html_document: default
+header-includes:
+  - \usepackage{luatexja}
+---
+
+```{r setup, include=FALSE}
+
+knitr::opts_chunk$set(echo = TRUE, comment = NA)
+
+library(car)
+library(MASS)
+
+setwd("C:/Users/sep10_z1vk0al/OneDrive/Documents/TEMP")
+
+
+dat2 <- read.csv("20180618testdata.csv", na.strings = "N")
+dat2 <- na.omit(dat2)
+rownames(dat2[,1])
+
+FacN <- c("insi",rep(1,5), rep(4,8), 3, 3, rep(2,7), rep(3,4), rep(2,5), rep(3,5),2,rep(1,7), 2)
+
+
+res <- numeric(0)
+
+for(i in 1:4){
+  
+  key <- FacN == i
+  
+  sub <- dat2[,key]
+  
+  res1 <- rowSums(sub)
+  
+  res <- cbind(res, res1)
+
+}
+
+ colnames(res) <- c("Enjo", "Gakusyu", "Syousatsu", "Rakkan")
+
+```
+
+相関係数は
+
+```{r}
+cor(res)
+```
+  
+まずはじめの重回帰分析
+  
+```{r}
+ res <- as.data.frame(res)
+ 
+ model <- Rakkan ~ Enjo + Gakusyu + Syousatsu
+ 
+ Reg <- lm(model, data = res)
+ 
+ summary(Reg)
+```
+
+
+多重共線性をチェック
+```{r}
+vif(Reg)
+```
+10以上ではないので，問題はなさそう。  
+
+次はステップワイズによる変数選択
+```{r}
+stepAIC(Reg, direction = "both", scope = list(upper = ~Enjo+Gakusyu+Syousatsu, lowwer = ~1))
+```
+  
+最終的にAICがもっとも小さくなったモデルは省察を除いて，援助と学習のみを投入したモデルであった。  
+
+この結果をもとに再度重回帰分析をおこなう。  
+```{r}
+ Reg <- lm(Rakkan~ Enjo+Gakusyu, data = res)
+
+summary(Reg)
+```
+

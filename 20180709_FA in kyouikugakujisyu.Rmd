@@ -1,0 +1,74 @@
+---
+title: "FA in kyouikugakujisyu"
+author: "T.SHIBUYA"
+date: "2018年7月9日"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, comment = NA, warning = F)
+
+resi <- read.csv("20180618testdata.csv", na.strings = "N")
+
+resi <- resi[,-1]
+
+E <- eigen(cor(resi, use = "p"))$values
+
+FA_mv4 <- fa(resi, nfactors = 4, fm = "ml", rotate = "geominQ")
+# 4因子で説明できたのはだいたい4割
+FA_mv3 <- fa(resi, nfactors = 3, fm = "ml", rotate = "varimax")
+
+FA_mv2 <- fa(resi, nfactors = 2, fm = "ml", rotate = "varimax")
+# こちらのほうがわずかにBICは小さく，有利そう
+
+
+```
+
+固有値の減衰状況を確認。
+ギリギリ4因子，あるいは2～3因子の方がフィットしそう。
+```{r}
+
+
+
+plot(E, type = "b", ylab = "component", xlab = "Eigen Value")
+
+
+
+```
+
+まずは最尤法で2～3因子を抽出＆プロマックス回転，因子負荷量とBICを確認。
+
+```{r}
+FA_mv4$BIC
+FA_mv3$BIC
+FA_mv2$BIC
+
+#inshi <- c(rep(1,5), rep(4,8), 3, 3, rep(2,7), rep(3,4), rep(2,5), rep(3,5),2,rep(1,7), 2)
+#factorN <- c(rep("ML3",5), rep("ML2",8), "ML4", "ML4", rep("ML1",7), rep("ML4",4), rep("ML1",5), rep("ML4",5),"ML1",rep("ML3",7), "ML1")
+
+#cbind(factor(factorN) ,FA_mv4$loadings)
+
+print(FA_mv4$loadings, sort = T, cutoff = 0)
+
+
+FA_mv4
+
+
+```
+
+3因子での解釈可能性
+
+```{r}
+print(FA_mv3$loadings, sort = T, cutoff = 0)
+```
+
+2因子での解釈可能性
+
+```{r}
+print(FA_mv2$loadings, sort = T, cutoff = 0)
+
+
+plot(FA_mv2$loadings[,1], FA_mv2$loadings[,2], ylim = c(-1,1),xlim = c(-1,1))
+```
+
+
