@@ -1,0 +1,55 @@
+---
+title: "master_thesis"
+author: "T.SHIBUYA"
+date: "2019/1/10"
+output:
+  powerpoint_presentation: default
+  slidy_presentation: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE)
+library(irtfun2)
+library(tidyverse)
+#devtools::install_github("richfitz/remoji")
+library(remoji)
+```
+
+# TITLE
+
+## Who are you?
+
+Name  
+ - SHIBUYA Takumi  
+ 
+Grade  
+ - M2  
+ 
+Interest  
+ - IRT  
+ - Psychometric model  
+ - Educational Measurement  
+ - Developmental scale  
+ 
+Hobby
+ - Anime (Sunday Morning!!)  
+ - Programing(R, C++)  
+ - Museum(Art, Historical)
+ 
+
+## INTRODUCTION
+
+IRT + Vertical Scaling = Measuring person development!
+
+2 parameter logistic model
+```{r 2PLM, fig.align='center', fig.height=2, fig.width=3}
+data.frame(theta=c(-4,4)) %>% 
+  ggplot(aes(x=theta))+
+  stat_function(fun=irtfun2::ptheta, args = list(a=1.5, b=0, c=0, D=1.702))
+```
+
+
+## estimation
+
+### Use `irtfun2`
+

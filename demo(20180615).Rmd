@@ -1,0 +1,67 @@
+---
+title: "demo"
+author: "T.SHIBUYA"
+date: "2018年6月15日"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, comment = NA)
+
+one <- data.frame(matrix(c(1,2,3,4,5,6,7,8,9), 3, 3))
+
+twe <- data.frame(matrix(c(9,8,7,6,5,4,3,2,1), 3, 3))
+
+res <- one == twe
+
+```
+
+データセット
+
+```{r}
+return(one)
+return(twe)
+return(res)
+```
+
+`res`ので`F`となっている度数を確認する。  
+
+これなら，度数が0であっても計算できるが，
+
+```{r}
+table(factor(res[,1], levels = c(TRUE, FALSE)))
+```
+
+`apply`を適用しようとすると，関数の中の関数に，引数を渡せないため，`apply`では実効不可能。
+
+```{r, error=T}
+apply(res, 2, table(factor), levels = c(TRUE, FALSE))
+```
+
+そこで，関数を自作して，実行する。
+
+```{r}
+Fun <- function(x){
+  
+  a <- sum(x == T)
+  b <- sum(x == F)
+  
+  return(c(a,b))
+}
+
+
+apply(res, 2, Fun)
+```
+
+次は，マッチしていない要素の行数，列数を調べる。  
+
+これでOK
+
+```{r}
+grep(F,res[,1])
+
+
+apply(res, 2, grep, pattern = F)
+```
+
+

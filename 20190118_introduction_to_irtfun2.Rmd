@@ -1,0 +1,37 @@
+---
+title: "01_introduction_to_irtfun2"
+author: "T.SHIBUYA"
+date: "2019/1/18"
+output: github_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, comment = NA)
+```
+
+## `irtfun2` とは。
+
+`irtfun2`は私が作成，維持している項目反応理論 (Item Response Theory, IRT) の分析に特化したパッケージです。まだまだ機能は少ないですが，Rで使用可能なパッケージにはないいくつかの機能を備えています。
+
+ - 多母集団モデルでのパラメタ推定ができる。
+ - 項目パラメタの推定方法として，周辺ベイズ推定法や正則化周辺最尤推定法が使用できる。
+ - 一般項目反応モデル (Genelal IRT model) の分析ができる。
+ 
+などです。
+
+　とはいえ，まずはソフトを走らせてみることが，理解への早道だと思いますので，早速`irtfun2`をインストールして，関数を使用してみましょう。
+
+
+## `estip`関数
+
+```{r explain_estip, echo=FALSE}
+library(irtfun2)
+# ?estip
+```
+
+`Examples`のコードは仮想的に発生させた01のテストデータを`estip`で分析するものです。これを実行してみましょう。
+
+```{r}
+res <- estip(x=sim_data_1, fc=2)
+```
+

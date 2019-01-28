@@ -1,0 +1,54 @@
+---
+title: "異なる難易度のテスト項目のIRT垂直尺度化"
+author: "T.SHIBUYA"
+date: "2019/1/10"
+output: ioslides_presentation
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE)
+```
+
+## 問題関心
+
+　国語や算数，数学などの教科は学年をまたいで内容が継続して学習されるため，一回のテストの結果だけを参考に学力を評価するよりも，これまでのテストの得点を考慮して，**学力の伸び**を評価する方が適しているのではないか。
+
+
+　その伸びを測るための尺度を，異なる難易度のテスト項目を**IRTモデル**により**対応づけ(linking)**して構成する方法が，**垂直尺度化**である。
+
+
+## IRTモデル  
+
+　受検者の特性（能力）と項目の特性（困難度，識別力）をモデル上で独立に定義している。
+
+ - 特定の項目，テストに依存しない受検者の能力が推定できる。
+ - 項目の特性値だけを取り出して，共通尺度化できる。
+ 
+ 
+```{r 2PLM, fig.align='center', fig.height=2, fig.width=3}
+data.frame(theta=c(-4,4)) %>% 
+  ggplot(aes(x=theta))+
+  stat_function(fun=irtfun2::ptheta, args = list(a=1.5, b=0, c=0, D=1.702))+
+  labs(y="correct probability", x="ability scale")
+```
+
+
+## 垂直尺度化  
+
+　IRTのパラメタの不定性を利用して，異なる複数のテスト項目のパラメタを共通尺度上に位置づける＝対応づけ。  
+　
+　その中でも，異なる学年で実施され，テストの難易度が異なる場合のものを垂直尺度化と呼ぶ。  
+　
+　
+　
+　<!-- ![linking](C:/Users/sep10_z1vk0al/OneDrive/Documents/12_R/R/20190110_linking.png "linking") -->
+　<img src="C:/Users/sep10_z1vk0al/OneDrive/Documents/12_R/R/20190110_linking.png" width="400" height="300">
+
+## 先行研究  
+
+
+## 実験  
+
+### 尺度化テストデザインに適した尺度調整法の検討
+
+### 実データを用いた垂直尺度構成

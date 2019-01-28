@@ -1,0 +1,351 @@
+---
+title: "MML-EM_validation"
+author: "T.SHIBUYA"
+date: "2019/1/8"
+output: word_document
+---
+
+```{r setup}
+knitr::opts_chunk$set(echo = TRUE)
+library(tidyverse)
+library(irtfun2)
+library(lazy.irtx)
+library(DT)
+```
+
+
+```{r data}
+# sample data generating
+#-------------------------------------------------------
+
+ptheta2 <- function(theta, a, b){
+  # IRT 2 PLM response probability
+  D <- 1.702
+  1/(1+exp(-D*a*(theta-b)))
+}
+
+resfunc2 <- function(prob){
+  # 反応確率と一様乱数から01データを発生させる関数。
+  # 受検者一人分の正答確率を与える。（apply関数などで）
+  prob <- matrix(prob, ncol = 1)
+  subfunc <- function(prob){
+    if(prob < runif(1)) res <- 0
+    else res <- 1
+    return(res)
+  }
+  res <- apply(prob, 1, subfunc)
+  return(res)
+}
+
+thetaMS <- matrix(c(0.0,1.0,
+                    0.4,0.9,
+                    0.8,0.8,
+                    1.2,0.7,
+                    1.6,0.6),
+                  ncol = 2, byrow = T)
+
+# grade ID
+gradeID <- c("A","B","C","D","E")
+
+
+# true item parameter matrix
+true_para <- matrix(nrow = 30*7/3, ncol = 2)
+
+
+jj <- 1
+
+set.seed(0204)
+# grade item parameter
+for(g in 1:5){
+  
+  if(g == 1){ # 第一学年だけ，項目数が異なる（基準となるので）
+    # item parameters(exept scaling test item)
+    for(j in 1:(30*2/3)){
+      true_para[jj,1] <- rlnorm(1, -0.5, 0.3)
+      true_para[jj,2] <- rnorm(1, thetaMS[g,1], thetaMS[g,2])
+      jj <- jj + 1 # 挿入行数カウント
+    }
+  } else {
+    for(j in 1:(30*1/3)){
+      true_para[jj,1] <- rlnorm(1, -0.5, 0.3)
+      true_para[jj,2] <- rnorm(1, thetaMS[g,1], thetaMS[g,2])
+      jj <- jj + 1 # 挿入行数カウント
+    }
+  }
+}
+
+
+# scaling test item parameter
+for(g in 1:(30*1/3)){
+  true_para[jj,1] <- rlnorm(1, -1, 0.5)
+  true_para[jj,2] <- runif(1, -3, 3)
+  jj <- jj + 1
+}
+true_para <- data.frame(V3 = true_para[,1], V4 = true_para[,2])
+
+rm(jj)
+
+
+
+al <- c("a","b","c","d","e","f","st")
+c <- 2
+for(i in c("a","b","c","d","e")){
+  
+  num <- formatC(c(1:(30*1/3)), width = 3, flag = 0)
+  
+  if(i =="a"){
+    itemn1 <- apply(matrix(i, ncol = 1), 1, paste0, num)
+    itemn2 <- apply(matrix(al[c], ncol = 1), 1, paste0, num)
+    itemn3 <- apply(matrix(al[7], ncol = 1), 1, paste0, num)
+    itemID <- rbind(itemn1,itemn2,itemn3)
+  }  
+  
+  if(i !="a") {
+    itemn1 <- apply(matrix(i, ncol = 1), 1, paste0, num)
+    itemn2 <- apply(matrix(al[c], ncol = 1), 1, paste0, num)
+    itemn3 <- apply(matrix(al[7], ncol = 1), 1, paste0, num)
+    itemn <- rbind(itemn1,itemn2,itemn3)
+    itemID <- cbind(itemID,itemn)
+    rm(itemn1,itemn2,itemn3,itemn,num)
+  }
+  c <- c + 1
+} # end of i
+
+rm(al,c)
+
+
+for(g in 1:5){
+  
+  cat("grade ",g,".\n")
+  # item parameters(exept scaling test item)
+  
+  if( g == 1){
+    gradeitem <- c(seq.int(1,length.out = 30*2/3), seq.int(30*2 + 1, length.out = 30*1/3))
+  } else {
+    gradeitem <- c(seq.int(g*30*1/3+1,length.out = 30*2/3), seq.int(30*2 + 1, length.out = 30*1/3))
+  }
+  
+  a <-  true_para[gradeitem, 1]
+  b <-  true_para[gradeitem, 2]
+  
+  # ability parameter
+  theta <- rnorm(1000, thetaMS[g,1], thetaMS[g,2])
+  
+  # generate response patterns exept scaling test item
+  resp <- theta %>% 
+    matrix(ncol = 1) %>% 
+    apply(1,ptheta2, a = a, b = b) %>% 
+    apply(2,resfunc2) %>% 
+    t() %>% 
+    as.data.frame() 
+  
+  colnames(resp) <- itemID[,g]
+  
+  grade <- rep(g, 1000) %>% as.numeric() # グループIDはnumeric型であること。
+  
+  ID <- apply(matrix(gradeID[g], ncol = 1), 1, paste0,
+              formatC(c(1:1000), width = 5, flag = 0)) %>% 
+    as.character()
+  
+  resp <- cbind(ID, grade, resp)
+  
+  if(g == 1) {
+    RESP <- resp
+  } else {
+    # combine response data for concurrent calibration
+    suppressMessages(
+      suppressWarnings(
+        RESP <- RESP %>% dplyr::full_join(resp)
+      )
+    )
+  }
+  
+} # end of one grade 
+rm(a,b,g,grade,gradeID,gradeitem,i,ID,j,theta,itemID,resp)
+
+write.table(RESP, file="vald_data.dat", quote = F, sep = "", col.names = F, row.names = F, na="N")
+true_para <- data.frame(a=true_para$V3, b=true_para$V4)
+#---------------------------------------------------------------
+
+
+
+```
+
+
+##  推定
+```{r, cache=TRUE}
+#irtfun2
+res_irtfun2 <- irtfun2::estip(RESP, ng=5, gc=2, fc=3, min = -4, max = 4)
+#lazy.irtx
+res_lazy <- lazy.irt::uIRT(RESP,idvar = "ID",groupvar = "grade" ,type = rep("B2",ncol(RESP)-2), 
+                           baseform = 1, estmu = 1, estsigma = 1, npoint = 31, print = 0, 
+                           eps = 1e-4, epsd = 1e-5)
+# Easy Estimation
+res_easy <- read.csv("vald_dataPara.csv", skip = 1, header = F)
+```
+
+
+学年ごとに素点のヒストグラムを描画
+```{r}
+hist_dat <- data.frame(grade=RESP$grade %>% as.character())
+hist_dat$RawScore = rowSums(RESP[,c(-1,-2)], na.rm = T)
+hist_dat %>% ggplot(aes(x=RawScore, fill=grade, colour=grade)) + geom_histogram(binwidth = 1) + facet_grid(grade~.)
+```
+
+
+###  真値　　
+シミュレーション分析と同様の方法で発生させた。ただし，シミュレーションとは異なり，G1を平均0標準偏差1の基準学年とし，学年が上がるにつれて標準偏差を1ずつ減少させている。
+```{r}
+true_para
+```
+
+##  パラメタごとの比較  
+真値: true  
+分析に用いた関数: irtfun2  
+lazy.irtx: lazy  
+Easy Estimation: Easy  
+で表記。  
+```{r}
+comp_a <- data.frame(Item=res_irtfun2$para$Item, true=true_para$a, irtfun2=res_irtfun2$para$a, lazy=res_lazy$param$p1, Easy=res_easy$V3)
+comp_b <- data.frame(Item=res_irtfun2$para$Item, true=true_para$b, irtfun2=res_irtfun2$para$b, lazy=res_lazy$param$p2, Easy=res_easy$V4)
+
+label_grade <- c(rep("G1",20),rep("G2",10),rep("st",10),rep("G3",10),rep("G4",10),rep("G5",10))
+
+comp_a$grade <- label_grade
+comp_b$grade <- label_grade
+```
+
+
+###  識別力
+```{r, fig.align="center", fig.height=10}
+comp_a
+write.csv(comp_a, "comp_a_table.csv", quote = F, row.names = F)
+comp_a_d <- comp_a %>% tidyr::gather(key=method, value=a, -Item, -grade)
+comp_a_d$method <- comp_a_d$method %>% factor(levels = c("true", "irtfun2", "lazy", "Easy"))
+devEMF::emf("comp_a.emf", width = 5, height = 8)
+comp_a_d%>% ggplot(aes(x=a, y=Item, fill=grade, colour=grade))+
+  geom_point()+
+  facet_grid(.~method)
+dev.off()
+```
+
+###  困難度
+```{r, fig.align="center", fig.height=10}
+comp_b
+write.csv(comp_b, "comp_b_table.csv", quote = F, row.names = F)
+comp_b_d <- comp_b %>% tidyr::gather(key=method, value=a, -Item, -grade)
+comp_b_d$method <- comp_b_d$method %>% factor(levels = c("true", "irtfun2", "lazy", "Easy"))
+
+devEMF::emf("comp_b.emf", width = 5, height = 8)
+comp_b_d %>% ggplot(aes(x=a, y=Item, fill=grade, colour=grade))+
+  geom_point()+
+  facet_grid(.~method)
+dev.off()
+```
+
+##  Easy との比較  
+```{r}
+adiff <- res_easy$V3 - res_irtfun2$para$a
+bdiff <- res_easy$V4 - res_irtfun2$para$b
+
+plot(1:70, adiff, xlab = "Item")
+plot(1:70, bdiff, xlab = "Item")
+```
+　識別力は全体での差はほとんどないと言って良いが，困難度が系統的にずれている。これはEステップの事前分布か，EMサイクル更新のときにおこなう尺度調整が起因していると考えられる。Easy EstimationではEステップの事前分布に，受検者の期待度数からもとめた分布を用いているのに対し，myfuncとlazy.irtxでは正規分布を用いている。
+
+##  lazy との比較  
+```{r}
+adiff <- res_lazy$param$p1 - res_irtfun2$para$a
+bdiff <- res_lazy$param$p2 - res_irtfun2$para$b
+
+plot(1:70, adiff, xlab = "Item")
+plot(1:70, bdiff, xlab = "Item")
+```
+　識別力パラメタの40項目以降で，10項目ごとにズレが生じている。しかしほとんどが0.01以下のズレであり，計算結果はほぼ一致していると言える。  
+
+##  lazyとEasyの比較  
+```{r}
+adiff <- res_easy$V3 - res_lazy$param$p1 
+bdiff <- res_easy$V4 - res_lazy$param$p2 
+
+plot(1:70, adiff, xlab = "Item")
+plot(1:70, bdiff, xlab = "Item")
+```
+　myfuncの推定結果と同様に，困難度に系統的なズレがあるものの，識別力の推定結果はほとんど一致している。
+
+
+##  trueとmyfuncの比較  
+```{r}
+adiff <- true_para$a - res_irtfun2$para$a
+bdiff <- true_para$b - res_irtfun2$para$b
+
+plot(1:70, adiff, xlab = "Item")
+plot(1:70, bdiff, xlab = "Item")
+```
+
+##  true とEasyの比較  
+```{r}
+adiff <- true_para$a - res_easy$V3
+bdiff <- true_para$b - res_easy$V4
+
+plot(1:70, adiff, xlab = "Item")
+plot(1:70, bdiff, xlab = "Item")
+```
+
+　全学年共通項目のパラメタの推定精度が悪い。しかし，後述するグラフから分かるようにEasyとlazyでもその結果は同じであり，推定プログラム固有の影響ではないと考えられる。
+
+##  true とlazyの比較  
+```{r}
+adiff <- true_para$a - res_lazy$param$p1
+bdiff <- true_para$b - res_lazy$param$p2
+
+plot(1:70, adiff, xlab = "Item")
+plot(1:70, bdiff, xlab = "Item")
+```
+
+##  母集団分布の比較（推定値のみ）　　
+###  MML-EMで推定された母集団平均＆標準偏差
+
+|学年|平均|標準偏差|
+|----|----|--------|
+|G1|0|1|
+|G2|0.4329271|1.0998473|
+|G3|0.8267747|0.9683944|
+|G4|1.3176517|0.8820991|
+|G5|1.8727051|0.7246097|
+
+
+### 真値として設定した母集団平均＆標準偏差
+
+|学年|平均|標準偏差|
+|----|----|--------|
+|G1|0|1|
+|G2|0.4|0.9|
+|G3|0.8|0.8|
+|G4|1.2|0.7|
+|G5|1.6|0.6|
+
+
+
+###  Easy Estimationで推定された母集団平均＆標準偏差
+
+|学年|平均|標準偏差|
+|----|----|--------|
+|G1|0.00000|1.00000|
+|G2|0.43082|1.10222|
+|G3|0.82613|0.97573|
+|G4|1.32027|0.90939|
+|G5|1.88322|0.75216|
+
+
+###  lazy.irtxで推定された母集団平均＆標準偏差
+
+|学年|平均|標準偏差|
+|----|----|--------|
+|G1|0|1|
+|G2|0.4291024|1.0989962|
+|G3|0.8195406|0.9685041|
+|G4|1.3096390|0.8914594|
+|G5|1.8712678|0.7441478|
+
+推定母集団分布も，myfuncの推定結果はEasy Estimationとlazy.irtxの推定結果と類似しており，推定プログラムは正常に機能していると言える。

@@ -1,0 +1,27 @@
+\documentclass{jsarticle}
+
+%\usepackage{luatexja}
+\usepackage{amsmath, amssymb}
+
+
+\begin{document}
+\SweaveOpts{concordance=TRUE}
+
+<<>>=
+rnorm(10)
+dnorm(10)
+@
+
+これはsweaveのテストです。  
+
+sweaveを使えばRとLaTeXを組み合わせて，Rstudio上で実行できます。
+
+
+数式も，
+
+\begin{eqnarray}
+  y &=& ax + b
+\end{eqnarray}
+
+このとおり。
+\end{document}
