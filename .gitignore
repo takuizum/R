@@ -2,6 +2,8 @@
 
 .pdf
 ngakudata/
-.rprofile
-.rdata
-.rhistory
+.Rproj.user
+.Rhistory
+.Ruserdata
+.aux
+.out
