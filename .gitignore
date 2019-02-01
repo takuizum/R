@@ -1,9 +1,11 @@
-﻿# ignore
-
-.pdf
+# ignore
+*.pdf
+*.docx
 ngakudata/
-.Rproj.user
-.Rhistory
-.Ruserdata
-.aux
-.out
+*.Rproj.user
+*.Rhistory
+*.Ruserdata
+*.aux
+*.out
+R.Rproj
+*.html
