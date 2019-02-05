@@ -1,5 +1,7 @@
 # observed score equating
 
+library(equate)
+library(irtfun2)
 # equi percentile equating
 
 

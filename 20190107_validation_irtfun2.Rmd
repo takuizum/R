@@ -2,31 +2,52 @@
 title: "MML-EM_validation"
 author: "T.SHIBUYA"
 date: "2019/1/8"
-output: word_document
+output: md_document
 ---
 
 ```{r setup}
-knitr::opts_chunk$set(echo = TRUE)
+knitr::opts_chunk$set(echo = TRUE, comment = NA)
 library(tidyverse)
+library(magrittr)
 library(irtfun2)
 library(lazy.irtx)
-library(DT)
 ```
+
+# プログラム推定値の妥当性検証
+
+## 妥当性検証がなぜ必要か
+
+　IRTに限らず数値計算を実行するプログラムで重要なことは，得られている結果が本当に正しいのかどうかです。
+
+　ソフトウェア単体であれば，収束しているかどうかや適合度，周辺対数尤度の数値の変化などを確認することで，推定プログラムがうまくいっているかどうかを知ることができます。
+
+　しかし，より複雑なプログラムになればそれだけでは不十分であり，一見収束していても，正しい推定値が得られていないことがあります。それはプログラムの数値計算等の本質的な部分ではなく，イテレーションの範囲を指定することが間違っていたり，符号が逆だったりなど，細部の設定によるものだったりします。大抵，数値計算部分でうまくプログラムが組めていない場合，収束しなかったり，明らかにおかしな値を取るため，すぐわかります。
+
+## 使用するプログラムについて
+
+　`irtfun2`パッケージの`estip`の妥当性検証のためには`kazy.irt`とEasy Estimationを使うことにします。本当であれば商用のプログラムを使いたいところですが，無料でできる範囲でやってみます。
+
+## シミュレーションデータの生成。
+
+　擬似的に発生させた$\theta$と識別力，困難度から２PLMにしたがって項目反応データを生成します。パラメタから反応確率を計算し，その確率と一様乱数を比較する，単純な棄却法です。`irtfun2`の`sim_gen`にも同様の方法が用いられています。
+
+　しかし，今回は多母集団モデルに基づく推定を実行するため，少し複雑です。はじめに母集団のパラメタ(正規分布の平均とSD)を指定しておきます。
+
+　今回想定するテストデザインは尺度化テストデザインと呼ばれるものです。通常の共通項目デザインとは異なり，全ての集団間で共通の項目を一部に含むデザインです。
 
 
 ```{r data}
 # sample data generating
-#-------------------------------------------------------
 
+
+# IRT 2 PLM response probability
 ptheta2 <- function(theta, a, b){
-  # IRT 2 PLM response probability
   D <- 1.702
   1/(1+exp(-D*a*(theta-b)))
 }
 
+# item response probability
 resfunc2 <- function(prob){
-  # 反応確率と一様乱数から01データを発生させる関数。
-  # 受検者一人分の正答確率を与える。（apply関数などで）
   prob <- matrix(prob, ncol = 1)
   subfunc <- function(prob){
     if(prob < runif(1)) res <- 0
@@ -37,16 +58,16 @@ resfunc2 <- function(prob){
   return(res)
 }
 
-thetaMS <- matrix(c(0.0,1.0,
-                    0.4,0.9,
-                    0.8,0.8,
-                    1.2,0.7,
-                    1.6,0.6),
+# theta parameter
+thetaMS <- matrix(c(-0.8,1.0,
+                    -0.4,1.0,
+                     0.0,1.0,
+                     0.4,1.0,
+                     0.8,1.0),
                   ncol = 2, byrow = T)
 
 # grade ID
 gradeID <- c("A","B","C","D","E")
-
 
 # true item parameter matrix
 true_para <- matrix(nrow = 30*7/3, ncol = 2)
@@ -115,10 +136,6 @@ rm(al,c)
 
 
 for(g in 1:5){
-  
-  cat("grade ",g,".\n")
-  # item parameters(exept scaling test item)
-  
   if( g == 1){
     gradeitem <- c(seq.int(1,length.out = 30*2/3), seq.int(30*2 + 1, length.out = 30*1/3))
   } else {
@@ -153,39 +170,29 @@ for(g in 1:5){
     RESP <- resp
   } else {
     # combine response data for concurrent calibration
-    suppressMessages(
-      suppressWarnings(
-        RESP <- RESP %>% dplyr::full_join(resp)
-      )
-    )
+    RESP %<>% dplyr::full_join(resp) %>% suppressWarnings() %>% suppressMessages()
   }
   
 } # end of one grade 
 rm(a,b,g,grade,gradeID,gradeitem,i,ID,j,theta,itemID,resp)
 
-write.table(RESP, file="vald_data.dat", quote = F, sep = "", col.names = F, row.names = F, na="N")
+RESP2 <- RESP
+RESP2$grade <- matrix(c(3,2,1,4,5)) %>% apply(1, rep.int, times = 1000) %>% as.vector()
+
+# Output response data for Easy Estimation
+write.table(RESP2, file="vald_data.dat", quote = F, sep = "", col.names = F, row.names = F, na="N")
+
 true_para <- data.frame(a=true_para$V3, b=true_para$V4)
-#---------------------------------------------------------------
 
 
+RESP %>% head(10) %>% knitr::kable(format = "markdown")
 
 ```
 
+### 学年ごとに素点のヒストグラムを描画
 
-##  推定
-```{r, cache=TRUE}
-#irtfun2
-res_irtfun2 <- irtfun2::estip(RESP, ng=5, gc=2, fc=3, min = -4, max = 4)
-#lazy.irtx
-res_lazy <- lazy.irt::uIRT(RESP,idvar = "ID",groupvar = "grade" ,type = rep("B2",ncol(RESP)-2), 
-                           baseform = 1, estmu = 1, estsigma = 1, npoint = 31, print = 0, 
-                           eps = 1e-4, epsd = 1e-5)
-# Easy Estimation
-res_easy <- read.csv("vald_dataPara.csv", skip = 1, header = F)
-```
+　こんな感じのデータを作りました。
 
-
-学年ごとに素点のヒストグラムを描画
 ```{r}
 hist_dat <- data.frame(grade=RESP$grade %>% as.character())
 hist_dat$RawScore = rowSums(RESP[,c(-1,-2)], na.rm = T)
@@ -193,19 +200,41 @@ hist_dat %>% ggplot(aes(x=RawScore, fill=grade, colour=grade)) + geom_histogram(
 ```
 
 
-###  真値　　
-シミュレーション分析と同様の方法で発生させた。ただし，シミュレーションとは異なり，G1を平均0標準偏差1の基準学年とし，学年が上がるにつれて標準偏差を1ずつ減少させている。
-```{r}
-true_para
+##  推定＆結果
+
+　先ほど作った項目反応データから項目パラメタを推定してみます。Easy EstimationはRからは実行できないので，あらかじめ推定して得られたパラメタファイルを読み込んでおきます。
+
+```{r, cache=TRUE}
+#irtfun2
+res_irtfun2 <- irtfun2::estip(RESP2, ng = 5, gc = 2, fc = 3, min = -6, max = 6, thdist = "empirical", print = 0)
+#lazy.irtx
+res_lazy <- lazy.irt::uIRT(RESP2, idvar = "ID",groupvar = "grade" ,type = rep("B2",ncol(RESP2)-2), 
+                           baseform = 1, estmu = 1, estsigma = 1, npoint = 31, print = 0, 
+                           eps = 1e-4, epsd = 1e-5, thmin = -6, thmax = 6)
+# Easy Estimation
+res_easy <- read.csv("vald_dataPara.csv", skip = 1, header = F)
 ```
 
-##  パラメタごとの比較  
-真値: true  
-分析に用いた関数: irtfun2  
-lazy.irtx: lazy  
-Easy Estimation: Easy  
-で表記。  
+　`irtfun2`の thdist = "empirical" というオプションは，$\theta$の事前分布に，Eステップの計算から得られた多項分布を使用するためです。Easy Estimationはこの設定で動いていますが，lazy.irtは正規分布を使用しているようです。
+
+###  真値　　
+
+　パラメタの真値はこんな感じです
+
 ```{r}
+true_para %>% knitr::kable(format = "markdown")
+```
+
+##  パラメタごとの比較
+
+* 真値: true  
+* irtfun2: irtfun2  
+* lazy.irtx: lazy  
+* Easy Estimation: Easy
+
+で表記。 
+
+```{r, include=TRUE}
 comp_a <- data.frame(Item=res_irtfun2$para$Item, true=true_para$a, irtfun2=res_irtfun2$para$a, lazy=res_lazy$param$p1, Easy=res_easy$V3)
 comp_b <- data.frame(Item=res_irtfun2$para$Item, true=true_para$b, irtfun2=res_irtfun2$para$b, lazy=res_lazy$param$p2, Easy=res_easy$V4)
 
@@ -213,34 +242,38 @@ label_grade <- c(rep("G1",20),rep("G2",10),rep("st",10),rep("G3",10),rep("G4",10
 
 comp_a$grade <- label_grade
 comp_b$grade <- label_grade
+
+Item <- res_irtfun2$para$Item %>% as.character()
 ```
 
 
 ###  識別力
 ```{r, fig.align="center", fig.height=10}
-comp_a
-write.csv(comp_a, "comp_a_table.csv", quote = F, row.names = F)
-comp_a_d <- comp_a %>% tidyr::gather(key=method, value=a, -Item, -grade)
-comp_a_d$method <- comp_a_d$method %>% factor(levels = c("true", "irtfun2", "lazy", "Easy"))
-devEMF::emf("comp_a.emf", width = 5, height = 8)
-comp_a_d%>% ggplot(aes(x=a, y=Item, fill=grade, colour=grade))+
+comp_a %>% knitr::kable(format = "markdown")
+#write.csv(comp_a, "comp_a_table.csv", quote = F, row.names = F)
+
+comp_a_d <- comp_a %>%  tidyr::gather(key=method, value=a, -Item, -grade)
+comp_a_d$method %<>% factor(levels = c("true", "irtfun2", "lazy", "Easy"))
+
+# ggplot
+comp_a_d %>% ggplot(aes(x=a, y=Item, fill=grade, colour=grade))+
   geom_point()+
   facet_grid(.~method)
-dev.off()
+# ggsave("comp_a.png")
 ```
 
 ###  困難度
 ```{r, fig.align="center", fig.height=10}
-comp_b
-write.csv(comp_b, "comp_b_table.csv", quote = F, row.names = F)
-comp_b_d <- comp_b %>% tidyr::gather(key=method, value=a, -Item, -grade)
-comp_b_d$method <- comp_b_d$method %>% factor(levels = c("true", "irtfun2", "lazy", "Easy"))
+comp_b %>% knitr::kable(format = "markdown")
+# write.csv(comp_b, "comp_b_table.csv", quote = F, row.names = F)
 
-devEMF::emf("comp_b.emf", width = 5, height = 8)
+comp_b_d <- comp_b %>%  tidyr::gather(key=method, value=a, -Item, -grade)
+comp_b_d$method %<>% factor(levels = c("true", "irtfun2", "lazy", "Easy"))
+
 comp_b_d %>% ggplot(aes(x=a, y=Item, fill=grade, colour=grade))+
   geom_point()+
   facet_grid(.~method)
-dev.off()
+# ggsave("comp_b.png")
 ```
 
 ##  Easy との比較  
@@ -248,39 +281,67 @@ dev.off()
 adiff <- res_easy$V3 - res_irtfun2$para$a
 bdiff <- res_easy$V4 - res_irtfun2$para$b
 
-plot(1:70, adiff, xlab = "Item")
-plot(1:70, bdiff, xlab = "Item")
+diff_i_e <- data.frame(Item = Item, label = label_grade, a = adiff, b = bdiff)
+diff_i_e %>% knitr::kable(format = "markdown")
+
+diff_i_e %>% tidyr::gather(key = type_of_para, value = para, -Item, -label) %>% 
+  ggplot(aes(x = para, y = Item, colour = label))+
+  geom_point()+
+  facet_wrap(.~type_of_para)+
+  theme(legend.position = 'none')
 ```
-　識別力は全体での差はほとんどないと言って良いが，困難度が系統的にずれている。これはEステップの事前分布か，EMサイクル更新のときにおこなう尺度調整が起因していると考えられる。Easy EstimationではEステップの事前分布に，受検者の期待度数からもとめた分布を用いているのに対し，myfuncとlazy.irtxでは正規分布を用いている。
+
+　識別力は全体での差はほとんどないと言って良いですね。困難度は上のレベルの項目ではちょっと大きくズレているようですが，いずれも0.02程度ですし，問題ないでしょう。aしかし，001の項目はなぜか大きくズレていますね。
 
 ##  lazy との比較  
 ```{r}
 adiff <- res_lazy$param$p1 - res_irtfun2$para$a
 bdiff <- res_lazy$param$p2 - res_irtfun2$para$b
 
-plot(1:70, adiff, xlab = "Item")
-plot(1:70, bdiff, xlab = "Item")
+diff_i_l <- data.frame(Item = Item, label = label_grade, a = adiff, b = bdiff)
+diff_i_l %>% knitr::kable(format = "markdown")
+
+diff_i_l %>% tidyr::gather(key = type_of_para, value = para, -Item, -label) %>% 
+  ggplot(aes(x = para, y = Item, colour = label))+
+  geom_point()+
+  facet_wrap(.~type_of_para)+
+  theme(legend.position = 'none')
 ```
-　識別力パラメタの40項目以降で，10項目ごとにズレが生じている。しかしほとんどが0.01以下のズレであり，計算結果はほぼ一致していると言える。  
+
+　困難度で系統的なズレが生じていますが，おそらく尺度の原点の設定の問題でしょう。lazy.irtの多母集団推定の基準設定にバグがあるようです。
 
 ##  lazyとEasyの比較  
 ```{r}
 adiff <- res_easy$V3 - res_lazy$param$p1 
 bdiff <- res_easy$V4 - res_lazy$param$p2 
 
-plot(1:70, adiff, xlab = "Item")
-plot(1:70, bdiff, xlab = "Item")
+diff_l_e <- data.frame(Item = Item, label = label_grade, a = adiff, b = bdiff)
+diff_l_e %>% knitr::kable(format = "markdown")
+
+diff_l_e %>% tidyr::gather(key = type_of_para, value = para, -Item, -label) %>% 
+  ggplot(aes(x = para, y = Item, colour = label))+
+  geom_point()+
+  facet_wrap(.~type_of_para)+
+  theme(legend.position = 'none')
 ```
-　myfuncの推定結果と同様に，困難度に系統的なズレがあるものの，識別力の推定結果はほとんど一致している。
+
+　irtfun2の推定結果と同様に，困難度に系統的なズレがあるものの，識別力の推定結果はほとんど一致しています。
 
 
-##  trueとmyfuncの比較  
+##  trueとirtfun2の比較
+
 ```{r}
 adiff <- true_para$a - res_irtfun2$para$a
 bdiff <- true_para$b - res_irtfun2$para$b
 
-plot(1:70, adiff, xlab = "Item")
-plot(1:70, bdiff, xlab = "Item")
+diff_i_t <- data.frame(Item = Item, label = label_grade, a = adiff, b = bdiff)
+diff_i_t %>% knitr::kable(format = "markdown")
+
+diff_i_t %>% tidyr::gather(key = type_of_para, value = para, -Item, -label) %>% 
+  ggplot(aes(x = para, y = Item, colour = label))+
+  geom_point()+
+  facet_wrap(.~type_of_para)+
+  theme(legend.position = 'none')
 ```
 
 ##  true とEasyの比較  
@@ -288,64 +349,77 @@ plot(1:70, bdiff, xlab = "Item")
 adiff <- true_para$a - res_easy$V3
 bdiff <- true_para$b - res_easy$V4
 
-plot(1:70, adiff, xlab = "Item")
-plot(1:70, bdiff, xlab = "Item")
+diff_e_t <- data.frame(Item = Item, label = label_grade, a = adiff, b = bdiff)
+diff_e_t %>% knitr::kable(format = "markdown")
+
+diff_e_t %>% tidyr::gather(key = type_of_para, value = para, -Item, -label) %>% 
+  ggplot(aes(x = para, y = Item, colour = label))+
+  geom_point()+
+  facet_wrap(.~type_of_para)+
+  theme(legend.position = 'none')
 ```
 
-　全学年共通項目のパラメタの推定精度が悪い。しかし，後述するグラフから分かるようにEasyとlazyでもその結果は同じであり，推定プログラム固有の影響ではないと考えられる。
 
 ##  true とlazyの比較  
 ```{r}
 adiff <- true_para$a - res_lazy$param$p1
 bdiff <- true_para$b - res_lazy$param$p2
 
-plot(1:70, adiff, xlab = "Item")
-plot(1:70, bdiff, xlab = "Item")
+diff_l_t <- data.frame(Item = Item, label = label_grade, a = adiff, b = bdiff)
+diff_l_t %>% knitr::kable(format = "markdown")
+
+diff_l_t %>% tidyr::gather(key = type_of_para, value = para, -Item, -label) %>% 
+  ggplot(aes(x = para, y = Item, colour = label))+
+  geom_point()+
+  facet_wrap(.~type_of_para)+
+  theme(legend.position = 'none')
 ```
 
-##  母集団分布の比較（推定値のみ）　　
-###  MML-EMで推定された母集団平均＆標準偏差
+　G2からG4あたりまでは推定精度がかなりいいのですが，シミュレーションデータでもG1やstのような分布の端の方に位置するような項目は推定精度がかなり悪いです。個人的な研究の範囲だと，全学年共通項目は対応づけの観点からかなりきつい制約がかかって推定されることがわかっているので，それが原因でこんなに推定値がズレているのでしょう。
 
-|学年|平均|標準偏差|
-|----|----|--------|
-|G1|0|1|
-|G2|0.4329271|1.0998473|
-|G3|0.8267747|0.9683944|
-|G4|1.3176517|0.8820991|
-|G5|1.8727051|0.7246097|
+<!-- ##  母集団分布の比較（推定値のみ）　　 -->
+<!-- ###  MML-EMで推定された母集団平均＆標準偏差 -->
 
-
-### 真値として設定した母集団平均＆標準偏差
-
-|学年|平均|標準偏差|
-|----|----|--------|
-|G1|0|1|
-|G2|0.4|0.9|
-|G3|0.8|0.8|
-|G4|1.2|0.7|
-|G5|1.6|0.6|
+<!-- |学年|平均|標準偏差| -->
+<!-- |----|----|--------| -->
+<!-- |G1|0|1| -->
+<!-- |G2|0.4329271|1.0998473| -->
+<!-- |G3|0.8267747|0.9683944| -->
+<!-- |G4|1.3176517|0.8820991| -->
+<!-- |G5|1.8727051|0.7246097| -->
 
 
+<!-- ### 真値として設定した母集団平均＆標準偏差 -->
 
-###  Easy Estimationで推定された母集団平均＆標準偏差
-
-|学年|平均|標準偏差|
-|----|----|--------|
-|G1|0.00000|1.00000|
-|G2|0.43082|1.10222|
-|G3|0.82613|0.97573|
-|G4|1.32027|0.90939|
-|G5|1.88322|0.75216|
+<!-- |学年|平均|標準偏差| -->
+<!-- |----|----|--------| -->
+<!-- |G1|0|1| -->
+<!-- |G2|0.4|0.9| -->
+<!-- |G3|0.8|0.8| -->
+<!-- |G4|1.2|0.7| -->
+<!-- |G5|1.6|0.6| -->
 
 
-###  lazy.irtxで推定された母集団平均＆標準偏差
 
-|学年|平均|標準偏差|
-|----|----|--------|
-|G1|0|1|
-|G2|0.4291024|1.0989962|
-|G3|0.8195406|0.9685041|
-|G4|1.3096390|0.8914594|
-|G5|1.8712678|0.7441478|
+<!-- ###  Easy Estimationで推定された母集団平均＆標準偏差 -->
 
-推定母集団分布も，myfuncの推定結果はEasy Estimationとlazy.irtxの推定結果と類似しており，推定プログラムは正常に機能していると言える。
+<!-- |学年|平均|標準偏差| -->
+<!-- |----|----|--------| -->
+<!-- |G1|0.00000|1.00000| -->
+<!-- |G2|0.43082|1.10222| -->
+<!-- |G3|0.82613|0.97573| -->
+<!-- |G4|1.32027|0.90939| -->
+<!-- |G5|1.88322|0.75216| -->
+
+
+<!-- ###  lazy.irtxで推定された母集団平均＆標準偏差 -->
+
+<!-- |学年|平均|標準偏差| -->
+<!-- |----|----|--------| -->
+<!-- |G1|0|1| -->
+<!-- |G2|0.4291024|1.0989962| -->
+<!-- |G3|0.8195406|0.9685041| -->
+<!-- |G4|1.3096390|0.8914594| -->
+<!-- |G5|1.8712678|0.7441478| -->
+
+<!-- 推定母集団分布も，myfuncの推定結果はEasy Estimationとlazy.irtxの推定結果と類似しており，推定プログラムは正常に機能していると言える。 -->
