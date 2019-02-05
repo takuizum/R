@@ -23,7 +23,9 @@ need_pkg4 <- c("plink", "mirt", )
 library(irtoys)
 
 ?est
-p.1pl <- est(Scored, model="1PL", engine="icl")
+p.1pl <- est(Scored, model="1PL", engine="ltm")
 
 # irtfun2 sourse ver
-devtools::install_github("takuizum/irtfun2", type = "sourse", dependencies = TRUE)
+devtools::install_github("takuizum/irtfun2", dependencies = TRUE)
+
+library(irtfun2)
