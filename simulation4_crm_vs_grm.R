@@ -301,6 +301,8 @@ mod <- mirt.model("F1 = 1-10")
 # nested list
 subject_condition <- list_along(subject)
 names(subject_condition) <- paste("subject", subject, sep = "_")
+
+sink("/Users/takuizum/OneDrive/Documents/console.txt")
 for(n in subject){
   category_condition <- list_along(category)
   names(category_condition) <- paste("category", category, sep = "_")
@@ -308,8 +310,10 @@ for(n in subject){
     cat("Estimating",k,"category data...\n\n\n")
     mctime_trial <- list_along(1:mctime)
     names(mctime_trial) <- paste("mctime", 1:mctime, sep = "_")
-    for(mct in 1:mctime){
+    mct <- 0
+    while(mct != 50){ # stop when the counter reachs 50 
       # data generation routine----------------------------
+      mct <- mct + 1
       cat(mct, "time simulation...\n")
       flag <- TRUE
       t <- 0
@@ -355,7 +359,10 @@ for(n in subject){
       # EstCRM
       cat("Runnning EstCRM...")
       estcrm <- try(suppressWarnings(EstCRMitem(dat %>% as.data.frame, max.item = rep(k, 10), min.item = rep(1, 10))), silent = T)
-      estcrm
+      if(class(estcrm) == "try-error"){
+        next
+        mct <- mct - 1
+      }
         # estcrm$LL
       crmtheta_mle2 <- try(EstCRMperson(dat %>% as.data.frame, ipar = estcrm$param, max.item = rep(k, 10), min.item = rep(1, 10)))
       # AIC
@@ -387,6 +394,7 @@ for(n in subject){
   }
   subject_condition[[paste("subject", n, sep = "_")]] <- category_condition
 }
-
+sink()
 # save
-save(list = c("subject_condition", "category", "subject", "mctime"), file = "grm_sim4.Rdata")
+# save(list = c("subject_condition", "category", "subject", "mctime"), file = "grm_sim4.Rdata")
+save(list = c("subject_condition", "category", "subject", "mctime"), file = "/Users/takuizum/OneDrive/Documents/grm_sim4.Rdata")
