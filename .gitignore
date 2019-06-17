@@ -13,3 +13,5 @@ R.Rproj
 EMアルゴリズム.html
 *.png
 *.emf
+*,csv
+*.html
